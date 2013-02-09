@@ -115,7 +115,9 @@ var TMCL = (function() {
      *
      */
     var bytes = function(data) {
-        if (data instanceof Uint32Array || data instanceof Int32Array)
+        if (data instanceof Float64Array)
+            return data.length * 8;
+        if (data instanceof Uint32Array || data instanceof Int32Array || data instanceof Float32Array)
             return data.length * 4;
         else if (data instanceof Uint16Array || data instanceof Int16Array)
             return data.length * 2;

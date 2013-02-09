@@ -1,61 +1,53 @@
-// cuda kernel
-var source = "__kernel void clVectorAdd(__global unsigned int* a, __global unsigned int* b, __global unsigned int* result, unsigned int width) { \
-     unsigned int x = get_global_id(0); \
-     if (x >= width) \
-       return; \
-    result[x] = a[x] + b[x]; \
+// kernel for computing the energy on the sphere
+var energyKernelSource = "__kernel void clEnergyKernel(__global float* points, __global float* result, int n) { \
+    unsigned int i = get_global_id(0); \
+    if (i >= n * 3) \
+        return; \
+\
+    float total = 0.0; \
+    for (int j = 0; j < n; j++) \
+        if (i != j) \
+            total += sqrt(pow(points[3*i] - points[3*j], 2) + pow(points[3*i+1] - points[3*j+1], 2) + pow(points[3*i+2] - points[3*j+ 2], 2)); \
+    result[i] = total; \
 }";
 
 $(function() {
-    // write output
-    var output = document.getElementById('output');
-    output.innerHTML = '';
-
-    // generate input vectors with 30 random values
-    var n = 30;
-    var vector1 = new Uint32Array(n);
-    var vector2 = new Uint32Array(n);
-    var result = new Uint32Array(n);
+    // generate n random points on a sphere
+    var n = 16;
+    var points = new Float32Array(n * 3);
+    var result = new Float32Array(n);
     for (var i = 0; i < n; i++) {
-        vector1[i] = Math.floor(Math.random() * 100);
-        vector2[i] = Math.floor(Math.random() * 100);
+        // generate random points in polar coordinates
+        var theta = Math.random() * 2 * Math.PI
+        var u = (Math.random() * 2) - 1
+
+        // save x, y, and z values
+        points[3 * i] = Math.sqrt(1 - u * u) * Math.cos(theta);
+        points[3 * i + 1] = Math.sqrt(1 - u * u) * Math.sin(theta);
+        points[3 * i + 2] = u;
     }
 
     // connect to gpu
-    var tmcl = new TMCL();
+    var tmcl = new TMCL;
 
     // compile kernel from source
-    //var vector_kernel = tmcl.compile(source, 'clVectorAdd');
-    tmcl.compile(source, 'clVectorAdd');
+    var energyKernel = tmcl.compile(energyKernelSource, 'clEnergyKernel');
 
     // send data to gpu
-    var vector1Handle = tmcl.toGPU(vector1);
-    var vector2Handle = tmcl.toGPU(vector2)
+    var pointsHandle = tmcl.toGPU(points);
     var resultHandle = tmcl.toGPU(result);
 
-    // run kernel
-    var local = 8;
-    var global = Math.ceil(n / local) * local;
-    tmcl.kernels.clVectorAdd({
-    //vector_kernel({
+    // compute energies for this configuraton
+    var local = n / 2;
+    var global = n;
+    energyKernel({
         local: local,
         global: global
-    }, vector1Handle, vector2Handle, resultHandle, new Uint32(n));
+    }, pointsHandle, resultHandle, new Int32(n));
 
-    // read result from gpu
-    //var r = tmcl.fromGPU(resultHandle);
+    // get energies from GPU
     tmcl.fromGPU(resultHandle, result);
 
     // display result
-    output.innerHTML += "<br>Vector1 = ";
-    for (var i = 0; i < n; i++)
-        output.innerHTML += vector1[i] + ", ";
-
-    output.innerHTML += "<br>Vector2 = ";
-    for (var i = 0; i < n; i++)
-        output.innerHTML += vector2[i] + ", ";
-
-    output.innerHTML += "<br>Result = ";
-    for (var i = 0; i < n; i++)
-        output.innerHTML += result[i] + ", ";
+    console.log(result);
 });

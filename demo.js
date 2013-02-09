@@ -22,7 +22,7 @@ $(function() {
     }
 
     // connect to gpu
-    var tmcl = new TMCL();
+    var tmcl = new TMCL;
 
     // compile kernel from source
     var vectorKernel = tmcl.compile(source, 'clVectorAdd');
