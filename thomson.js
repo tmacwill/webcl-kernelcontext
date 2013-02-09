@@ -12,42 +12,76 @@ var energyKernelSource = "__kernel void clEnergyKernel(__global float* points, _
 }";
 
 $(function() {
+    /**
+     * Generate random points on a sphere
+     *
+     */
+    function generate(points, n) {
+        for (var i = 0; i < n; i++) {
+            // generate random points in polar coordinates
+            var theta = Math.random() * 2 * Math.PI;
+            var u = (Math.random() * 2) - 1;
+
+            // save x, y, and z values
+            points[3 * i] = Math.sqrt(1 - u * u) * Math.cos(theta);
+            points[3 * i + 1] = Math.sqrt(1 - u * u) * Math.sin(theta);
+            points[3 * i + 2] = u;
+        }
+    }
+
+    /**
+     * Compute the total energy from a result array
+     *
+     */
+    function energy(result, n) {
+        var total = 0.0;
+        for (var i = 0; i < n; i++)
+            total += result[i];
+
+        return total;
+    }
+
     // generate n random points on a sphere
     var n = 16;
     var points = new Float32Array(n * 3);
     var result = new Float32Array(n);
-    for (var i = 0; i < n; i++) {
-        // generate random points in polar coordinates
-        var theta = Math.random() * 2 * Math.PI
-        var u = (Math.random() * 2) - 1
-
-        // save x, y, and z values
-        points[3 * i] = Math.sqrt(1 - u * u) * Math.cos(theta);
-        points[3 * i + 1] = Math.sqrt(1 - u * u) * Math.sin(theta);
-        points[3 * i + 2] = u;
-    }
 
     // connect to gpu
     var tmcl = new TMCL;
 
     // compile kernel from source
     var energyKernel = tmcl.compile(energyKernelSource, 'clEnergyKernel');
-
-    // send data to gpu
-    var pointsHandle = tmcl.toGPU(points);
     var resultHandle = tmcl.toGPU(result);
 
-    // compute energies for this configuraton
-    var local = n / 2;
-    var global = n;
-    energyKernel({
-        local: local,
-        global: global
-    }, pointsHandle, resultHandle, new Int32(n));
+    // try a different number of energy computations
+    var runs = 10;
+    var min = Number.MAX_VALUE;
+    var energies = [];
+    for (var i = 0; i < runs; i++) {
+        // generate a new, random set of points
+        generate(points, n);
 
-    // get energies from GPU
-    tmcl.fromGPU(resultHandle, result);
+        // send data to gpu
+        var pointsHandle = tmcl.toGPU(points);
 
-    // display result
-    console.log(result);
+        // compute energies for this configuraton
+        var local = n / 2;
+        var global = n;
+        energyKernel({
+            local: local,
+            global: global
+        }, pointsHandle, resultHandle, new Int32(n));
+
+        // get energies from GPU, and check if we found a better configuration
+        tmcl.fromGPU(resultHandle, result);
+        var e = energy(result, n);
+        if (e < min)
+            min = e;
+
+        // remember all energies
+        energies.push(e);
+    }
+
+    console.log('Energies', energies);
+    console.log('Minimum energy', min);
 });
