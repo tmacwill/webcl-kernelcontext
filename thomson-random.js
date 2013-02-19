@@ -7,8 +7,8 @@ var energyKernelSource = "__kernel void clEnergyKernel(__global float* points, _
     float total = 0.0; \
     for (int j = 0; j < n; j++) \
         if (i != j) \
-            total += sqrt(pow(points[3*i] - points[3*j], 2) + pow(points[3*i+1] - points[3*j+1], 2) + pow(points[3*i+2] - points[3*j+ 2], 2)); \
-    result[i] = total; \
+            total += 1.0 / sqrt(pow(points[3*i] - points[3*j], 2) + pow(points[3*i+1] - points[3*j+1], 2) + pow(points[3*i+2] - points[3*j+2], 2)); \
+    result[i] = total / 2.0; \
 }";
 
 $(function() {
