@@ -87,10 +87,9 @@ var KernelContext = (function() {
     var KernelContext = function() {
         // make sure webcl is supported
         if (window.WebCL == undefined) {
-            alert("Unfortunately your system does not support WebCL. " +
+            throw "Unfortunately your system does not support WebCL. " +
                   "Make sure that you have both the OpenCL driver " +
-                  "and the WebCL browser extension installed.");
-            return false;
+                  "and the WebCL browser extension installed.";
         }
 
         // connect to gpu
