@@ -47,11 +47,11 @@ $(function() {
     var result = new Float32Array(n);
 
     // connect to gpu
-    var tmcl = new TMCL;
+    var context = new KernelContext;
 
     // compile kernel from source
-    var energyKernel = tmcl.compile(energyKernelSource, 'clEnergyKernel');
-    var resultHandle = tmcl.toGPU(result);
+    var energyKernel = context.compile(energyKernelSource, 'clEnergyKernel');
+    var resultHandle = context.toGPU(result);
 
     // try a different number of energy computations
     var runs = 10;
@@ -62,7 +62,7 @@ $(function() {
         generate(points, n);
 
         // send data to gpu
-        var pointsHandle = tmcl.toGPU(points);
+        var pointsHandle = context.toGPU(points);
 
         // compute energies for this configuraton
         var local = n / 2;
@@ -73,7 +73,7 @@ $(function() {
         }, pointsHandle, resultHandle, new Int32(n));
 
         // get energies from GPU, and check if we found a better configuration
-        tmcl.fromGPU(resultHandle, result);
+        context.fromGPU(resultHandle, result);
         var e = energy(result, n);
         if (e < min)
             min = e;

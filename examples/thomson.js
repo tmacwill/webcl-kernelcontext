@@ -71,13 +71,13 @@ $(function() {
     var energyResult = new Float32Array(n);
 
     // connect to gpu
-    var tmcl = new TMCL;
+    var context = new KernelContext;
 
     // compile kernels from source
-    var energyKernel = tmcl.compile(energyKernelSource, 'clEnergyKernel');
-    var forceKernel = tmcl.compile(forceKernelSource, 'clForceKernel');
-    var energyResultHandle = tmcl.toGPU(energyResult);
-    var forceResultHandle = tmcl.toGPU(forceResult);
+    var energyKernel = context.compile(energyKernelSource, 'clEnergyKernel');
+    var forceKernel = context.compile(forceKernelSource, 'clForceKernel');
+    var energyResultHandle = context.toGPU(energyResult);
+    var forceResultHandle = context.toGPU(forceResult);
 
     // generate a new, random set of points
     generate(points, n);
@@ -89,7 +89,7 @@ $(function() {
     var energies = [];
     for (var i = 0; i < runs; i++) {
         // send data to gpu
-        var pointsHandle = tmcl.toGPU(points);
+        var pointsHandle = context.toGPU(points);
 
         // compute energies for this configuraton
         var local = n / 2;
@@ -100,7 +100,7 @@ $(function() {
         }, pointsHandle, energyResultHandle, new Int32(n));
 
         // get energies from GPU, check if we found a better configuration
-        tmcl.fromGPU(energyResultHandle, energyResult);
+        context.fromGPU(energyResultHandle, energyResult);
         var e = energy(energyResult, n);
         if (e < min)
             min = e;
@@ -115,7 +115,7 @@ $(function() {
         }, pointsHandle, forceResultHandle, new Int32(n));
 
         // compute new locations for points
-        tmcl.fromGPU(forceResultHandle, forceResult);
+        context.fromGPU(forceResultHandle, forceResult);
 
         // update points based on forces
         for (var j = 0; j < n; j++) {

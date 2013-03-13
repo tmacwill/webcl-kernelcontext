@@ -1,8 +1,8 @@
 /**
- * TMCL Number, which has a value and a type
+ * KernelContext Number, which has a value and a type
  *
  */
-var TMCLNumber = (function() {
+var KernelContextNumber = (function() {
     /**
      * Constructor
      *
@@ -10,7 +10,7 @@ var TMCLNumber = (function() {
      * @param {String} type Type of number
      *
      */
-    var TMCLNumber = function(n, type) {
+    var KernelContextNumber = function(n, type) {
         this.n = n;
         this.type = type;
     };
@@ -19,38 +19,38 @@ var TMCLNumber = (function() {
      * Conform to native Number interface
      *
      */
-    TMCLNumber.prototype.valueOf = function() {
+    KernelContextNumber.prototype.valueOf = function() {
         return this.n;
     };
 
-    return TMCLNumber;
+    return KernelContextNumber;
 })();
 
 /**
  * Scalar type definitions
  *
  */
-var Char = function(n) { return new TMCLNumber(n, 'Char'); };
-var Float = function(n) { return new TMCLNumber(n, 'Float'); };
-var Int32 = function(n) { return new TMCLNumber(n, 'Int32'); };
-var Int16 = function(n) { return new TMCLNumber(n, 'Int16'); };
-var Int8 = function(n) { return new TMCLNumber(n, 'Int8'); };
-var Uint32 = function(n) { return new TMCLNumber(n, 'Uint32'); };
-var Uint16 = function(n) { return new TMCLNumber(n, 'Uint16'); };
-var Uint8 = function(n) { return new TMCLNumber(n, 'Uint8'); };
+var Char = function(n) { return new KernelContextNumber(n, 'Char'); };
+var Float = function(n) { return new KernelContextNumber(n, 'Float'); };
+var Int32 = function(n) { return new KernelContextNumber(n, 'Int32'); };
+var Int16 = function(n) { return new KernelContextNumber(n, 'Int16'); };
+var Int8 = function(n) { return new KernelContextNumber(n, 'Int8'); };
+var Uint32 = function(n) { return new KernelContextNumber(n, 'Uint32'); };
+var Uint16 = function(n) { return new KernelContextNumber(n, 'Uint16'); };
+var Uint8 = function(n) { return new KernelContextNumber(n, 'Uint8'); };
 
-var TMCL = (function() {
+var KernelContext = (function() {
     /**
      * Object representing an executable WebCL kernel
      * To run, simply call this like a function, and it will be executed on the GPU
      *
-     * @param {Object} tmcl Reference to tmcl object that generated this kernel
+     * @param {Object} kernelContext Reference to context object that generated this kernel
      * @param {Object} kernel Compiled kernel object to be executed
      *
      */
-    var TMCLKernel = function(tmcl, kernel) {
-        // store references to tmcl object and compiled kernel so we can use them later
-        this.tmcl = tmcl;
+    var KernelContextKernel = function(kernelContext, kernel) {
+        // store references to context object and compiled kernel so we can use them later
+        this.kernelContext = kernelContext;
         this.kernel = kernel;
 
         // return function that when executed (with arguments) will run kernel on GPU
@@ -75,7 +75,7 @@ var TMCL = (function() {
             }
 
             // execute kernel
-            self.tmcl.queue.enqueueNDRangeKernel(self.kernel, params.global.length, [], params.global, params.local, []);
+            self.kernelContext.queue.enqueueNDRangeKernel(self.kernel, params.global.length, [], params.global, params.local, []);
         };
     };
 
@@ -84,7 +84,7 @@ var TMCL = (function() {
      * Connect to GPU if WebCL is supported
      *
      */
-    var TMCL = function() {
+    var KernelContext = function() {
         // make sure webcl is supported
         if (window.WebCL == undefined) {
             alert("Unfortunately your system does not support WebCL. " +
@@ -155,7 +155,7 @@ var TMCL = (function() {
      * @param {String} f Name of function inside source code to compile
      *
      */
-    TMCL.prototype.compile = function(source, f) {
+    KernelContext.prototype.compile = function(source, f) {
         // get kernel source
         var program = this.context.createProgramWithSource(source);
 
@@ -170,7 +170,7 @@ var TMCL = (function() {
         }
 
         // create a new kernel object from compiled source
-        return new TMCLKernel(this, program.createKernel(f));
+        return new KernelContextKernel(this, program.createKernel(f));
     };
 
     /**
@@ -181,7 +181,7 @@ var TMCL = (function() {
      * @return {Object} Data from GPU
      *
      */
-    TMCL.prototype.fromGPU = function(handle, result) {
+    KernelContext.prototype.fromGPU = function(handle, result) {
         // if result is not pre-allocated, then look up type and allocate space
         if (result === undefined)
             for (var i = 0; i < this.onGPU.length; i++)
@@ -204,7 +204,7 @@ var TMCL = (function() {
      * @return {Object} Handle to data on GPU
      *
      */
-    TMCL.prototype.toGPU = function(data) {
+    KernelContext.prototype.toGPU = function(data) {
         // create and enqueue a new buffer for writing
         var size = bytes(data);
         var buffer = this.context.createBuffer(WebCL.CL_MEM_READ_WRITE, size);
@@ -219,5 +219,5 @@ var TMCL = (function() {
         return buffer;
     };
 
-    return TMCL;
+    return KernelContext;
 })();

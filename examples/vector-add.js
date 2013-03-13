@@ -22,15 +22,15 @@ $(function() {
     }
 
     // connect to gpu
-    var tmcl = new TMCL;
+    var context = new KernelContext;
 
     // compile kernel from source
-    var vectorKernel = tmcl.compile(source, 'clVectorAdd');
+    var vectorKernel = context.compile(source, 'clVectorAdd');
 
     // send data to gpu
-    var vector1Handle = tmcl.toGPU(vector1);
-    var vector2Handle = tmcl.toGPU(vector2)
-    var resultHandle = tmcl.toGPU(result);
+    var vector1Handle = context.toGPU(vector1);
+    var vector2Handle = context.toGPU(vector2)
+    var resultHandle = context.toGPU(result);
 
     // run kernel
     var local = 8;
@@ -41,8 +41,8 @@ $(function() {
     }, vector1Handle, vector2Handle, resultHandle, new Uint32(n));
 
     // read result from gpu
-    //also supported: var r = tmcl.fromGPU(resultHandle);
-    tmcl.fromGPU(resultHandle, result);
+    //also supported: var r = context.fromGPU(resultHandle);
+    context.fromGPU(resultHandle, result);
 
     // display result
     output.innerHTML += "<br>Vector1 = ";
