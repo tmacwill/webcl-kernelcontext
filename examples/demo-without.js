@@ -1,13 +1,3 @@
-/*
- * how javascript number is implemented
- * fixed-size array
- * string to cuda function
- * run cuda function just like any other function
- * to gpu for cuda arrays
- * from gpu to get data back
- *
- */
-
 function loadKernel(id){
     var kernelElement = document.getElementById(id);
     var kernelSource = kernelElement.text;
