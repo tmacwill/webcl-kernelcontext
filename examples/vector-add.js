@@ -1,4 +1,3 @@
-// cuda kernel
 var source = "__kernel void clVectorAdd(__global unsigned int* a, __global unsigned int* b, __global unsigned int* result, unsigned int width) { \
      unsigned int x = get_global_id(0); \
      if (x >= width) \

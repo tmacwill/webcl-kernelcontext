@@ -76,6 +76,7 @@ var KernelContext = (function() {
 
             // execute kernel
             self.kernelContext.queue.enqueueNDRangeKernel(self.kernel, params.global.length, [], params.global, params.local, []);
+            self.kernelContext.queue.finish();
         };
     };
 

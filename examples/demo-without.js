@@ -1,15 +1,9 @@
-function loadKernel(id){
-    var kernelElement = document.getElementById(id);
-    var kernelSource = kernelElement.text;
-    if (kernelElement.src != "") {
-        var mHttpReq = new XMLHttpRequest();
-        mHttpReq.open('GET', kernelElement.src, false);
-        mHttpReq.send(null);
-        kernelSource = mHttpReq.responseText;
-    }
-
-    return kernelSource;
-}
+var source = "__kernel void clVectorAdd(__global unsigned int* a, __global unsigned int* b, __global unsigned int* result, unsigned int width) { \
+     unsigned int x = get_global_id(0); \
+     if (x >= width) \
+       return; \
+    result[x] = a[x] + b[x]; \
+}";
 
 $(function() {
     // write output
@@ -47,8 +41,7 @@ $(function() {
         var bufferResult = ctx.createBuffer(WebCL.CL_MEM_WRITE_ONLY, size);
 
         // get kernel source
-        var kernelSrc = loadKernel("clVectorAdd");
-        var program = ctx.createProgramWithSource(kernelSrc);
+        var program = ctx.createProgramWithSource(source);
         var devices = ctx.getContextInfo(WebCL.CL_CONTEXT_DEVICES);
 
         // compile kernel
