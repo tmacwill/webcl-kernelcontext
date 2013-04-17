@@ -1,6 +1,9 @@
 var KernelUtils = (function() {
+    // $N = block_dim (local_size)
+    // length = size of buffer <= #threads
+    // Launched with #threads rounded to multiple of block_dim (pad with $BASE)
     var reduceSource = "__kernel void reduce(__global $TYPE* buffer, __const int length, __global $TYPE* result) { \
-        local $TYPE scratch[$N] = { $BASE }; \
+        local $TYPE scratch[$N]; \
         int global_index = get_global_id(0); \
         int local_index = get_local_id(0); \
         if (global_index < length) \
@@ -31,17 +34,79 @@ var KernelUtils = (function() {
     };
 
     /**
-     * Return a CL type for the given data
-     * @param data {Array} Array to get data type for
+     * Return a CL type for the given Javascript type
+     * @param t {Function} Javascript type to get CL type for
      *
      */
-    var type = function(data) {
-        if (data instanceof Float64Array || data instanceof Float32Array)
+    var type = function(t) {
+        if (t == Float64Array)
+            return 'double'
+        if (t == Float32Array)
             return 'float';
-        if (data instanceof Uint32Array || data instanceof Uint16Array || Uint8Array)
+        if (t == Uint32Array || t == Uint16Array || Uint8Array)
             return 'unsigned int';
-        if (data instanceof Int32Array || data instanceof Int16Array || data instanceof Int8Array)
+        if (t == Int32Array || t == Int16Array || t == Int8Array)
             return 'int';
+    };
+
+    /**
+     * Construct a reduction kernel
+     * @param t {Function} Type of array to reduce
+     * @param op {String} Operation to perform on array
+     * @param base {Number} Optional base case for the reduction
+     * @param local {Number} Optional local memory size
+     * @return Function that can be called with two arguments: handle to device, length of vector
+     *
+     */
+    KernelUtils.prototype.reductionKernel = function(t, op, base, local) {
+        // default base case is 0
+        if (base === undefined)
+            base = 0;
+
+        // default value for local work size
+        if (local === undefined)
+            local = 32;
+
+        // compile kernel, replacing placeholders with input values
+        var source = reduceSource.replace(/\$N/g, local).replace(/\$TYPE/g, type(t))
+            .replace(/\$OP/g, op).replace(/\$BASE/g, base);
+        var kernel = this.context.compile(source, 'reduce');
+
+        var self = this;
+        return function(vector_d, length) {
+            // make sure vector length is a multiple of local size
+            var n = length;
+            if (n % local != 0)
+                n = length + local - (length % local);
+
+            // perform reductions until we converge
+            var result, result_d;
+            do {
+                // allocate result and send to GPU
+                result = new t(Math.ceil(n / local));
+                result_d = self.context.toGPU(result);
+
+                // execute kernel
+                kernel({
+                    local: local,
+                    global: Math.ceil(n / local) * local
+                }, vector_d, new Uint32(n), result_d);
+
+                // make sure vector length is a multiple of local size
+                n = result.length;
+                if (n % local != 0)
+                    n = result.length + local - (result.length % local);
+
+                // point next input at current output
+                vector_d = result_d;
+            }
+            while (result.length > 1);
+
+            // get final answer from gpu
+            var reduced = new t(1);
+            self.context.fromGPU(result_d, reduced);
+            return reduced[0];
+        };
     };
 
     /**
@@ -53,44 +118,9 @@ var KernelUtils = (function() {
      *
      */
     KernelUtils.prototype.reduce = function(vector, op, base, local) {
-        // default base case is 0
-        if (base === undefined)
-            base = 0;
-
-        // default value for local work size
-        if (local === undefined)
-            local = 32;
-        var global = Math.ceil(vector.length / local) * local;
-
-        // make sure input array is a power of 2
-        var n = Math.pow(2, Math.ceil(Math.log(vector.length) / Math.log(2)));
-        if (vector.length != n) {
-            // create a new array with length 2^m padded with the base case
-            var padded = new vector.constructor(n);
-            for (var i = 0; i < n; i++)
-                padded[i] = (i < vector.length) ? vector[i] : base;
-            vector = padded;
-        }
-
-        // send input and output to gpu
-        var result = new Uint32Array(1);
         var vector_d = this.context.toGPU(vector);
-        var result_d = this.context.toGPU(result);
-
-        // compile kernel, replacing placeholders with input values
-        var source = reduceSource.replace(/\$N/g, vector.length).replace(/\$TYPE/g, type(vector))
-            .replace(/\$OP/g, op).replace(/\$BASE/g, base);
-        var kernel = this.context.compile(source, 'reduce');
-
-        // execute kernel
-        kernel({
-            local: local,
-            global: global
-        }, vector_d, new Uint32(vector.length), result_d);
-
-        // get result from GPU
-        this.context.fromGPU(result_d, result);
-        return result[0];
+        var kernel = this.reductionKernel(vector.constructor, op, base, local);
+        return kernel(vector_d, vector.length);
     };
 
     return KernelUtils;

@@ -41,46 +41,6 @@ var Uint8 = function(n) { return new KernelContextNumber(n, 'Uint8'); };
 
 var KernelContext = (function() {
     /**
-     * Object representing an executable WebCL kernel
-     * To run, simply call this like a function, and it will be executed on the GPU
-     *
-     * @param {Object} kernelContext Reference to context object that generated this kernel
-     * @param {Object} kernel Compiled kernel object to be executed
-     *
-     */
-    var KernelContextKernel = function(kernelContext, kernel) {
-        // store references to context object and compiled kernel so we can use them later
-        this.kernelContext = kernelContext;
-        this.kernel = kernel;
-
-        // return function that when executed (with arguments) will run kernel on GPU
-        var self = this;
-        return function() {
-            // block and grid parameters
-            var params = arguments[0];
-
-            // make sure that params are arrays
-            if (!(params.global instanceof Array))
-                params.global = [params.global];
-            if (!(params.local instanceof Array))
-                params.local = [params.local];
-
-            // set each argument (to this inner function) as a kernel argument
-            for (var i = 1; i < arguments.length; i++) {
-                var type = webClType(arguments[i]);
-                if (type)
-                    self.kernel.setKernelArg(i - 1, arguments[i].valueOf(), type);
-                else
-                    self.kernel.setKernelArg(i - 1, arguments[i]);
-            }
-
-            // execute kernel
-            self.kernelContext.queue.enqueueNDRangeKernel(self.kernel, params.global.length, [], params.global, params.local, []);
-            self.kernelContext.queue.finish();
-        };
-    };
-
-    /**
      * Constructor
      * Connect to GPU if WebCL is supported
      *
@@ -169,8 +129,34 @@ var KernelContext = (function() {
                         program.getProgramBuildInfo(this.devices[0], WebCL.CL_PROGRAM_BUILD_LOG));
         }
 
-        // create a new kernel object from compiled source
-        return new KernelContextKernel(this, program.createKernel(f));
+        // create kernel from program
+        var kernel = program.createKernel(f);
+
+        // return callable function that executes already-compiled kernel
+        var self = this;
+        return function() {
+            // block and grid parameters
+            var params = arguments[0];
+
+            // make sure that params are arrays
+            if (!(params.global instanceof Array))
+                params.global = [params.global];
+            if (!(params.local instanceof Array))
+                params.local = [params.local];
+
+            // set each argument (to this inner function) as a kernel argument
+            for (var i = 1; i < arguments.length; i++) {
+                var type = webClType(arguments[i]);
+                if (type)
+                    kernel.setKernelArg(i - 1, arguments[i].valueOf(), type);
+                else
+                    kernel.setKernelArg(i - 1, arguments[i]);
+            }
+
+            // execute kernel
+            self.queue.enqueueNDRangeKernel(kernel, params.global.length, [], params.global, params.local, []);
+            self.queue.finish();
+        };
     };
 
     /**
