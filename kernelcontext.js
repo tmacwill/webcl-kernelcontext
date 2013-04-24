@@ -31,6 +31,7 @@ var KernelContextNumber = (function() {
  *
  */
 var Char = function(n) { return new KernelContextNumber(n, 'Char'); };
+var Double = function(n) { return new KernelContextNumber(n, 'Double'); };
 var Float = function(n) { return new KernelContextNumber(n, 'Float'); };
 var Int32 = function(n) { return new KernelContextNumber(n, 'Int32'); };
 var Int16 = function(n) { return new KernelContextNumber(n, 'Int16'); };
@@ -96,6 +97,7 @@ var KernelContext = (function() {
         // map of custom wrapper class names to webcl constants
         var scalars = {
             'Char': WebCL.types.CHAR,
+            'Double': WebCL.types.DOUBLE,
             'Float': WebCL.types.FLOAT,
             'Int32': WebCL.types.INT,
             'Int16': WebCL.types.SHORT,
@@ -155,7 +157,7 @@ var KernelContext = (function() {
 
             // execute kernel
             self.queue.enqueueNDRangeKernel(kernel, params.global.length, [], params.global, params.local, []);
-            self.queue.finish();
+            // self.queue.finish();
         };
     };
 

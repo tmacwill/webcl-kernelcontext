@@ -73,19 +73,19 @@ var KernelUtils = (function() {
         var kernel = this.context.compile(source, 'reduce');
 
         var self = this;
-        return function(vector_d, length) {
+        return function(vector_d, length, result_d) {
             // make sure vector length is a multiple of local size
             var n = length;
             if (n % local != 0)
                 n = length + local - (length % local);
 
-            // perform reductions until we converge
-            var result, result_d;
-            do {
-                // allocate result and send to GPU
-                result = new t(Math.ceil(n / local));
+            // allocate result and send to GPU
+            if (result_d === undefined) {
+                var result = new t(Math.ceil(n / local));
                 result_d = self.context.toGPU(result);
+            }
 
+            do {
                 // execute kernel
                 kernel({
                     local: local,
@@ -93,14 +93,14 @@ var KernelUtils = (function() {
                 }, vector_d, new Uint32(n), result_d);
 
                 // make sure vector length is a multiple of local size
-                n = result.length;
+                n = Math.ceil(n / local);
                 if (n % local != 0)
-                    n = result.length + local - (result.length % local);
+                    n = n + local - (n % local);
 
                 // point next input at current output
                 vector_d = result_d;
             }
-            while (result.length > 1);
+            while (Math.ceil(n / local) > 1);
 
             // get final answer from gpu
             var reduced = new t(1);

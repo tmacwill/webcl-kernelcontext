@@ -1,6 +1,6 @@
 $(function() {
     // generate input vectors with 30 random values
-    var n = 3;
+    var n = 100;
     var vector = new Uint32Array(n);
     var result = new Uint32Array(n);
     for (var i = 0; i < n; i++)
