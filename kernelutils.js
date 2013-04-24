@@ -24,6 +24,14 @@ var KernelUtils = (function() {
             result[get_group_id(0)] = scratch[0]; \
     }";
 
+    // source for a mapping kernel
+    var mapSource = "__kernel void map(__global $TYPE* result, __const int length, $ARGS) { \
+        int i = get_global_id(0); \
+        if (i > length) \
+            return; \
+        result[i] = $OP; \
+    }";
+
     /**
      * Constructor
      *
@@ -35,7 +43,7 @@ var KernelUtils = (function() {
 
     /**
      * Return a CL type for the given Javascript type
-     * @param t {Function} Javascript type to get CL type for
+     * @param {Function} t Javascript type to get CL type for
      *
      */
     var type = function(t) {
@@ -50,12 +58,80 @@ var KernelUtils = (function() {
     };
 
     /**
+     * Construct a mapping kernel
+     * @param {Function} t Type of array to map over
+     * @param {String} args Arguments to the mapper
+     * @param {String} op Mapping operation
+     *
+     */
+    KernelUtils.prototype.mapKernel = function(t, args, op, local) {
+        // default lcoal size
+        if (local === undefined)
+            local = 32;
+
+        // prefix each arg with the given type
+        var split = args.split(',');
+        for (var i = 0; i < split.length; i++)
+            split[i] = "__global " + type(t) + "* " + split[i];
+
+        // compile kernel, replacing placeholders with input values
+        var source = mapSource.replace(/\$OP/g, op).replace(/\$ARGS/g, split.join()).replace(/\$TYPE/g, type(t));
+        var kernel = this.context.compile(source, 'map');
+
+        // return function that will execute map
+        var self = this;
+        return function(result_d, length) {
+            // allocate result and send to GPU
+            if (result_d === undefined) {
+                var result = new t(length);
+                result_d = self.context.toGPU(result);
+            }
+
+            // execute kernel
+            kernel.apply(null, [{
+                local: local,
+                global: Math.ceil(length / local) * local
+            }, result_d, length].concat(Array.prototype.slice.apply(arguments).slice(2)));
+        };
+    };
+
+    /**
+     * Perform a map
+     * @param {String} args Arguments to mapper
+     * @param {String} op Mapping operation
+     * @return {Array} Result of map
+     *
+     */
+    KernelUtils.prototype.map = function(args, op) {
+        // make sure something is given to the mapper
+        if (arguments.length < 2)
+            return;
+
+        // send all mapping arguments to gpu
+        var handles = [];
+        for (var i = 2; i < arguments.length; i++)
+            handles.push(this.context.toGPU(arguments[i]));
+
+        // construct result handle and send to gpu
+        var result = new arguments[2].constructor(arguments[2].length);
+        var result_d = this.context.toGPU(result);
+
+        // perform map
+        var kernel = this.mapKernel(arguments[2].constructor, args, op);
+        kernel.apply(null, [result_d, result.length].concat(handles));
+
+        // get result from gpu
+        this.context.fromGPU(result_d, result);
+        return result;
+    };
+
+    /**
      * Construct a reduction kernel
-     * @param t {Function} Type of array to reduce
-     * @param op {String} Operation to perform on array
-     * @param base {Number} Optional base case for the reduction
-     * @param local {Number} Optional local memory size
-     * @return Function that can be called with two arguments: handle to device, length of vector
+     * @param {Function} t Type of array to reduce
+     * @param {String} op Operation to perform on array
+     * @param {Number} base Optional base case for the reduction
+     * @param {Number} local Optional local memory size
+     * @return {Function} Can be called with two arguments: handle to device, length of vector
      *
      */
     KernelUtils.prototype.reductionKernel = function(t, op, base, local) {
@@ -72,6 +148,7 @@ var KernelUtils = (function() {
             .replace(/\$OP/g, op).replace(/\$BASE/g, base);
         var kernel = this.context.compile(source, 'reduce');
 
+        // return function that will execute reduction
         var self = this;
         return function(vector_d, length, result_d) {
             // make sure vector length is a multiple of local size
@@ -111,10 +188,11 @@ var KernelUtils = (function() {
 
     /**
      * Perform a reduction
-     * @param vector {Array} Array to reduce
-     * @param op {String} Operation to perform on array
-     * @param base {Number} Optional base case for the reduction
-     * @param local {Number} Optional local memory size
+     * @param {Array} vector Array to reduce
+     * @param {String} op Operation to perform on array
+     * @param {Number} base Optional base case for the reduction
+     * @param {Number} local Optional local memory size
+     * @return {Object} Result of reduction
      *
      */
     KernelUtils.prototype.reduce = function(vector, op, base, local) {

@@ -19,6 +19,7 @@ $(function() {
     // compute sum reduction
     console.log('Sum Device (reduce): ', utils.reduce(vector, 'a + b'));
 
+    // construct a reduction kernel and execute to get the sum
     var sumKernel = utils.reductionKernel(Uint32Array, 'a + b');
     var vector_d = context.toGPU(vector);
     console.log('Sum Device (reductionKernel): ' + sumKernel(vector_d, n));
